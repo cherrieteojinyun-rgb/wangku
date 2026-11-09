@@ -7,9 +7,6 @@ from pathlib import Path
 
 import flet as ft
 
-from chat_client import ChatTransportError, post_gemini
-from theme import CORAL, MINT, MUTED, PRIMARY, PURPLE_SOFT, card, label, primary_button, title
-
 _CATEGORY_LABELS = ("Makanan", "Pengangkutan", "Hiburan", "Buku", "Lain-lain")
 _CATEGORY_MAP = {
     "food": "Makanan", "makanan": "Makanan",
@@ -175,100 +172,5 @@ def _render_items(review):
         column.page.update()
     except (AttributeError, RuntimeError):
         pass
-
-
-def review(photo, description, amount, category, message, on_save, on_retake, on_cancel):
-    key = _photo_key(photo)
-    review_state = _REVIEWS.setdefault(key, {
-        "items": [], "status": "Menunggu analisis resit…", "running": False, "started": False,
-    })
-    if not review_state["items"] and description is not None and (description.value or "").strip():
-        review_state["items"] = [{
-            "description": description.value or "",
-            "amount": (amount.value or "") if amount is not None else "",
-            "category": (category.value or "Makanan") if category is not None else "Makanan",
-        }]
-
-    review_state["status_control"] = ft.Text(review_state["status"], size=12, color=PRIMARY)
-    review_state["progress_control"] = ft.ProgressRing(size=16, stroke_width=2, color=PRIMARY, visible=review_state["running"])
-    review_state["items_control"] = ft.Column(spacing=10, tight=True)
-    _render_items(review_state)
-
-    def add_item(_event):
-        review_state["items"].append({"description": "", "amount": "", "category": "Makanan"})
-        _render_items(review_state)
-
-    async def submit(_event=None):
-        if key in _SUBMITTED:
-            return
-        transactions = []
-        for item in review_state["items"]:
-            name = (item.get("description") or "").strip()
-            try:
-                price = float(str(item.get("amount", "")).replace(",", "").replace("RM", "").strip())
-            except (TypeError, ValueError):
-                price = 0
-            if not name or price <= 0:
-                message.value = "Lengkapkan keterangan dan harga yang melebihi RM 0 untuk setiap item."
-                try:
-                    message.page.update()
-                except (AttributeError, RuntimeError):
-                    pass
-                return
-            transactions.append((name, price, item.get("category", "Makanan")))
-        if not transactions:
-            message.value = "Tambah sekurang-kurangnya satu item yang sah sebelum menghantar."
-            try:
-                message.page.update()
-            except (AttributeError, RuntimeError):
-                pass
-            return
-
-        _SUBMITTED.add(key)
-        try:
-            for name, price, item_category in transactions:
-                description.value = name
-                amount.value = str(price)
-                category.value = item_category
-                await on_save()
-        except Exception:
-            _SUBMITTED.discard(key)
-            message.value = "Tidak dapat menyimpan semua item. Sila cuba lagi."
-            try:
-                message.page.update()
-            except (AttributeError, RuntimeError):
-                pass
-
-    if not review_state["started"]:
-        review_state["started"] = True
-        review_state["task"] = asyncio.create_task(_analyze(photo, review_state))
-
-    return ft.Column([
-        card(ft.Image(src=photo, height=185, fit=ft.BoxFit.CONTAIN, border_radius=16), color=ft.Colors.WHITE, padding=10),
-        ft.Row([
-            ft.OutlinedButton(content=ft.Text("Ambil semula"), icon=ft.Icons.CAMERA_ALT, on_click=on_retake),
-            ft.TextButton("← Kembali", on_click=on_cancel),
-        ], spacing=8),
-        card(ft.Row([review_state["progress_control"], review_state["status_control"]], spacing=8), color=PURPLE_SOFT, padding=12),
-        review_state["items_control"],
-        ft.OutlinedButton(content=ft.Text("Tambah item"), icon=ft.Icons.ADD, on_click=add_item),
-        message,
-        ft.Row([primary_button("Hantar", submit, icon=ft.Icons.CHECK)], alignment=ft.MainAxisAlignment.END),
-    ], spacing=13, horizontal_alignment=ft.CrossAxisAlignment.STRETCH, tight=True)
-
-
-def live(camera, status, on_capture, on_cancel):
-    return ft.Column([
-        ft.TextButton("←  Kembali ke transaksi", on_click=on_cancel),
-        title("Imbas resit", size=27),
-        label("Halakan kamera ke resit atau tangkap skrin pembelian anda.", color=MUTED),
-        card(ft.Column([camera, status], spacing=10), padding=10),
-        card(ft.Row([
-            ft.Icon(ft.Icons.INFO_OUTLINE, color=PRIMARY),
-            label("Selepas mengambil gambar, semak butiran dan pilih kategori sebelum menyimpan.", size=12, color=MUTED),
-        ], spacing=9), color=PURPLE_SOFT, padding=12),
-        primary_button("Ambil gambar", on_capture, icon=ft.Icons.CAMERA_ALT),
-    ], spacing=14, horizontal_alignment=ft.CrossAxisAlignment.STRETCH)
-
 
 __all__ = ["live", "review"]
