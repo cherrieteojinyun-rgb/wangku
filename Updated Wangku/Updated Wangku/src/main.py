@@ -497,23 +497,58 @@ async def main(page: ft.Page):
         except Exception as error:
             log.warning("Camera preview could not resume: %s", error)
 
-    async def save_receipt():
-        description = (state["receipt_description"].value or "").strip()
-        amount = number(state["receipt_amount"].value)
+async def save_receipt():
+    photo = state["receipt_photo"]
+
+    if state.get("receipt_submitted", False):
+        return
+
+    items = scanner.get_items(photo)
+
+    valid_items = []
+
+    for item in items:
+        description = (item.get("description") or "").strip()
+        amount = number(item.get("amount"))
+
         if not description or amount is None or amount <= 0:
-            state["receipt_message"].value = "Masukkan keterangan dan jumlah yang melebihi RM 0."
+            state["receipt_message"].value = (
+                "Semak semua nama item dan harga. "
+                "Harga mesti melebihi RM 0."
+            )
             page.update()
             return
-        category = CATEGORY_OPTIONS.get(state["receipt_category"].value, "Other")
-        state["transactions"].insert(0, {"description": description, "category": category, "date": "Sebentar tadi · imbasan", "amount": amount})
-        await persist_transactions()
-        state["camera"] = None
-        state["camera_ready"] = False
-        state["receipt_photo"] = None
-        state["route"] = "app"
-        state["tab"] = "Transactions"
-        render()
 
+        category = CATEGORY_OPTIONS.get(
+            item.get("category"), "Other"
+        )
+
+        valid_items.append({
+            "description": description,
+            "category": category,
+            "date": "Sebentar tadi · imbasan",
+            "amount": amount,
+        })
+
+    if not valid_items:
+        return
+
+    state["receipt_submitted"] = True
+
+    state["transactions"] = (
+        valid_items + state["transactions"]
+    )
+
+    await persist_transactions()
+
+    state["camera"] = None
+    state["camera_ready"] = False
+    state["receipt_photo"] = None
+    state["receipt_submitted"] = False
+    state["route"] = "app"
+    state["tab"] = "Transactions"
+
+    render()
     def add_allowance():
         amount = ft.TextField(
             label="Jumlah elaun (RM)",
