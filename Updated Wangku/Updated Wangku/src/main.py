@@ -459,6 +459,7 @@ async def main(page: ft.Page):
             return
         try:
             state["receipt_photo"] = await state["camera"].take_picture()
+            state["receipt_submitted"] = False
             await state["camera"].pause_preview()
             state["receipt_description"] = ft.TextField(label="Apa yang dibeli?", hint_text="cth. makan tengah hari", border_radius=14)
             state["receipt_amount"] = ft.TextField(label="Jumlah (RM)", prefix=ft.Text("RM "), keyboard_type=ft.KeyboardType.NUMBER, border_radius=14)
