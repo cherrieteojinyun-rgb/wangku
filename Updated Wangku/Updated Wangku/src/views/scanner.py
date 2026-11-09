@@ -461,7 +461,7 @@ def review(photo, on_save, on_retake, on_cancel):
                 content=ft.Image(
                     src=photo,
                     height=185,
-                    fit=ft.ImageFit.CONTAIN,
+                    fit=ft.BoxFit.CONTAIN,,
                 ),
                 padding=10,
                 bgcolor=SURFACE,
